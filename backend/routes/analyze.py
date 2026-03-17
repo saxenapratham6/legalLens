@@ -42,6 +42,20 @@ async def analyze_document(request: AnalyzeRequest):
     Pipeline: Chunk → Classify → [Simplify | Risk Scan | Extract] → Compare → Report
     """
     try:
+        # Validate input text is readable (not binary data)
+        import re
+        readable_chars = len(re.findall(r'[a-zA-Z0-9\s]', request.text))
+        total_chars = len(request.text)
+        
+        if total_chars == 0:
+            raise HTTPException(status_code=400, detail="Document is empty")
+        
+        if total_chars > 0 and readable_chars / total_chars < 0.5:
+            raise HTTPException(
+                status_code=400, 
+                detail="Document appears to contain corrupted or binary data. Please upload a valid text-based document (PDF, DOCX, or TXT)."
+            )
+        
         # Step 1: Chunk the document
         chunks = chunk_text(request.text)
         chunk_texts = [c["text"] for c in chunks]

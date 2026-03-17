@@ -10,7 +10,7 @@ from agents.orchestrator.state import LexSimpleState
 def ingest_and_chunk(state: LexSimpleState) -> dict:
     """
     LangGraph node: take raw_text from state and split into chunks.
-    800-token windows with 150-token overlap (per PRD spec).
+    800-token windows with 150-token overlap for faster processing.
     """
     raw_text = state.get("raw_text", "")
     chunks = chunk_text(raw_text, window=800, overlap=150)
@@ -20,25 +20,47 @@ def ingest_and_chunk(state: LexSimpleState) -> dict:
 def chunk_text(text: str, window: int = 800, overlap: int = 150) -> list[dict]:
     """
     Split text into overlapping token-approximate chunks.
-    Uses whitespace-based word splitting as a fast approximation of tokens.
+    Uses character count with ~4 chars per token estimation (better for legal text).
+    Optimized chunk size of 800 tokens (~3200 chars) for faster processing.
     """
-    words = text.split()
+    # Approximate: 1 token ≈ 4 characters for English text
+    chars_per_token = 4
+    chunk_size_chars = window * chars_per_token
+    overlap_chars = overlap * chars_per_token
+    
     chunks = []
     start = 0
     chunk_id = 0
+    text_length = len(text)
 
-    while start < len(words):
-        end = min(start + window, len(words))
-        chunk_words = words[start:end]
-        chunk_text = " ".join(chunk_words)
-        chunks.append({
-            "chunk_id": f"chunk_{chunk_id}",
-            "text": chunk_text,
-            "start_word": start,
-            "end_word": end,
-        })
-        chunk_id += 1
-        start += window - overlap
+    while start < text_length:
+        end = min(start + chunk_size_chars, text_length)
+        
+        # Try to break at sentence boundaries for cleaner chunks
+        if end < text_length:
+            # Look for sentence ending within last 500 chars
+            search_start = max(start, end - 500)
+            last_period = text.rfind('. ', search_start, end)
+            last_newline = text.rfind('\n\n', search_start, end)
+            
+            # Use the closest sentence/paragraph boundary
+            boundary = max(last_period, last_newline)
+            if boundary > start:
+                end = boundary + 1
+        
+        chunk_text = text[start:end].strip()
+        
+        if chunk_text:  # Only add non-empty chunks
+            chunks.append({
+                "chunk_id": f"chunk_{chunk_id}",
+                "text": chunk_text,
+                "start_char": start,
+                "end_char": end,
+                "estimated_tokens": len(chunk_text) // chars_per_token,
+            })
+            chunk_id += 1
+        
+        start = end - overlap_chars if end < text_length else text_length
 
     return chunks
 
@@ -46,12 +68,24 @@ def chunk_text(text: str, window: int = 800, overlap: int = 150) -> list[dict]:
 def extract_text_from_pdf(filepath: str) -> str:
     """Extract text from a PDF file using pdfplumber."""
     import pdfplumber
+    import re
+    
     text_parts = []
     with pdfplumber.open(filepath) as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
             if page_text:
-                text_parts.append(page_text)
+                # Filter out binary/corrupted data
+                # Remove non-printable characters except newlines and tabs
+                cleaned = re.sub(r'[^\x20-\x7E\n\t]', '', page_text)
+                
+                # Only add if it contains actual readable text (not just whitespace/symbols)
+                if cleaned.strip() and len(re.findall(r'[a-zA-Z]', cleaned)) > 10:
+                    text_parts.append(cleaned)
+    
+    if not text_parts:
+        raise ValueError("No readable text found in PDF. The file may be corrupted, image-based, or encrypted.")
+    
     return "\n\n".join(text_parts)
 
 

@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     session_id: str = Field(..., description="Session identifier")
     message: str = Field(..., min_length=1, description="User's question")
     report: dict = Field(default={}, description="Analysis report for grounding")
+    negotiation_mode: bool = Field(default=False, description="Enable AI-powered negotiation suggestions")
 
 
 class ChatResponse(BaseModel):
@@ -40,6 +41,7 @@ async def chat(request: ChatRequest):
         result = qa_run({
             "chat_history": session["chat_history"],
             "report": session.get("report", request.report),
+            "negotiation_mode": request.negotiation_mode,
         })
 
         session["chat_history"] = result.get("chat_history", session["chat_history"])

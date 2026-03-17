@@ -10,15 +10,31 @@ def run(state: LexSimpleState) -> dict:
     """
     Handle user questions about the document.
     Cites clause references and appends legal disclaimer.
+    In negotiation mode, provides strategic negotiation advice.
     """
     chat_history = state.get("chat_history", [])
     report = state.get("report", {})
+    negotiation_mode = state.get("negotiation_mode", False)
 
     # Build context from the report for grounding
     context = json.dumps(report, indent=2) if report else "No report available yet."
 
+    # Modify system prompt based on negotiation mode
+    system_content = SYSTEM_PROMPT.format(context=context)
+    if negotiation_mode:
+        system_content += (
+            "\n\n**NEGOTIATION MODE ACTIVE**\n"
+            "You are now acting as a negotiation advisor. When answering questions:\n"
+            "1. Identify leverage points and weak spots in the contract\n"
+            "2. Suggest specific language changes that favor the user\n"
+            "3. Provide negotiation tactics (e.g., 'Request reciprocal clause', 'Propose cap on liability')\n"
+            "4. Highlight industry-standard alternatives to unfavorable terms\n"
+            "5. Recommend what to push back on vs. what to accept\n"
+            "6. Frame responses as actionable negotiation strategies"
+        )
+
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT.format(context=context)},
+        {"role": "system", "content": system_content},
     ]
     messages.extend(chat_history)
 

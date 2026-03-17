@@ -12,7 +12,8 @@ def run(state: LexSimpleState) -> dict:
     chunks = state.get("chunks", [])
     facts: list[dict] = []
 
-    for chunk in chunks:
+    # Limit to first 2 chunks for faster processing (demo mode)
+    for chunk in chunks[:2]:
         response = call_nemotron(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},

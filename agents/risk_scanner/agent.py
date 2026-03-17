@@ -26,7 +26,8 @@ def run(state: LexSimpleState) -> dict:
 
     tools = [SCORE_RISK_TOOL, RETRIEVE_PRECEDENT_TOOL, MARK_STANDARD_TOOL]
 
-    for chunk in chunks:
+    # Limit to first 2 chunks for faster processing (demo mode)
+    for chunk in chunks[:2]:
         prompt = SYSTEM_PROMPT.format(
             jurisdiction=jurisdiction,
             doc_type=doc_type,
@@ -38,8 +39,8 @@ def run(state: LexSimpleState) -> dict:
             {"role": "user", "content": f"Analyze this clause for risks:\n\n{chunk['text']}"},
         ]
 
-        # ReAct loop — allow up to 3 iterations per chunk
-        for _ in range(3):
+        # ReAct loop — allow up to 1 iteration per chunk for speed
+        for _ in range(1):
             response = call_nemotron(messages=messages, model=NEMOTRON_SUPER, tools=tools)
             msg = response.choices[0].message
 
