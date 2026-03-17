@@ -26,3 +26,5 @@ nohup.out
 
 # Converted PRD text
 LexSimple_PRD_v2_Hackathon.txt
+.vercel
+.env*.local
